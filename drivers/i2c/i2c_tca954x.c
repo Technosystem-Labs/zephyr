@@ -18,6 +18,7 @@ struct tca954x_root_config {
 	const struct device *bus;
 	uint16_t slave_addr;
 	uint8_t nchans;
+	const struct gpio_dt_spec reset_gpios;
 };
 
 struct tca954x_root_data {
@@ -110,6 +111,23 @@ static int tca954x_root_init(const struct device *dev)
 		return -ENODEV;
 	}
 
+	/* If the RESET line is available, configure it. */
+	if (config->reset_gpios.port) {
+		if (!device_is_ready(config->reset_gpios.port)) {
+			LOG_ERR("%s is not ready",
+				config->reset_gpios.port->name);
+			return -ENODEV;
+		}
+
+		if (gpio_pin_configure_dt(&config->reset_gpios, GPIO_OUTPUT)) {
+			LOG_ERR("%s: failed to configure RESET line", dev->name);
+			return -EIO;
+		}
+
+		/* Deassert reset line */
+		gpio_pin_set_dt(&config->reset_gpios, 0);
+	}
+
 	i2c_tca954x->selected_chan = 0;
 
 	return 0;
@@ -139,6 +157,13 @@ const struct i2c_driver_api tca954x_api_funcs = {
 	.transfer = tca954x_transfer,
 };
 
+#define INIT_RESET_GPIO(inst, compat)							\
+	COND_CODE_1(DT_NODE_HAS_PROP(DT_INST(inst, compat), reset_gpios),		\
+		    (								        \
+			    .reset_gpios = GPIO_DT_SPEC_GET_OR(			\
+					DT_INST(inst, compat), reset_gpios, {0}),     \
+		    ), ())
+
 #define TCA954x_CHILD_DEFINE(node_id)					    \
 	static const struct tca954x_channel_config			    \
 		tca954x_down_config_##node_id = {			    \
@@ -158,6 +183,7 @@ const struct i2c_driver_api tca954x_api_funcs = {
 		.slave_addr = DT_REG_ADDR_BY_IDX(DT_INST(inst, compat), 0),   \
 		.bus = DEVICE_DT_GET(DT_BUS(DT_INST(inst, compat))),		      \
 		.nchans = ch,			      \
+		INIT_RESET_GPIO(inst, compat)					      \
 	};								      \
 	static struct tca954x_root_data tca954x_data_##inst = {	      \
 		.lock = Z_MUTEX_INITIALIZER(tca954x_data_##inst.lock),	      \

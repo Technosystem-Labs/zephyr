@@ -13,14 +13,16 @@
 #include <spinlock.h>
 #include <drivers/timer/system_timer.h>
 
+#include <sys/printk.h>
+
 #define TIMER_BASE	        DT_INST_REG_ADDR(0)
 #define TIMER_LOAD_ADDR		((TIMER_BASE) + 0x00)
-#define TIMER_RELOAD_ADDR	((TIMER_BASE) + 0x10)
-#define TIMER_EN_ADDR		((TIMER_BASE) + 0x20)
-#define TIMER_EV_PENDING_ADDR	((TIMER_BASE) + 0x3c)
-#define TIMER_EV_ENABLE_ADDR	((TIMER_BASE) + 0x40)
-#define TIMER_TOTAL_UPDATE	((TIMER_BASE) + 0x44)
-#define TIMER_TOTAL		((TIMER_BASE) + 0x48)
+#define TIMER_RELOAD_ADDR	((TIMER_BASE) + 0x04)
+#define TIMER_EN_ADDR		((TIMER_BASE) + 0x08)
+#define TIMER_EV_PENDING_ADDR	((TIMER_BASE) + 0x18)
+#define TIMER_EV_ENABLE_ADDR	((TIMER_BASE) + 0x1c)
+#define TIMER_TOTAL_UPDATE	((TIMER_BASE) + 0x0c)
+#define TIMER_TOTAL		((TIMER_BASE) + 0x10)
 
 #define TIMER_EV	0x1
 #define TIMER_IRQ	DT_INST_IRQN(0)
@@ -44,8 +46,8 @@ uint32_t sys_clock_cycle_get_32(void)
 	uint32_t timer_total;
 	k_spinlock_key_t key = k_spin_lock(&lock);
 
-	litex_write8(UPDATE_TOTAL, TIMER_TOTAL_UPDATE);
-	timer_total = (uint32_t)litex_read64(TIMER_TOTAL);
+	sys_write8(UPDATE_TOTAL, TIMER_TOTAL_UPDATE);
+	timer_total = sys_read32(TIMER_TOTAL);
 
 	k_spin_unlock(&lock, key);
 
@@ -58,8 +60,8 @@ uint64_t sys_clock_cycle_get_64(void)
 	uint64_t timer_total;
 	k_spinlock_key_t key = k_spin_lock(&lock);
 
-	litex_write8(UPDATE_TOTAL, TIMER_TOTAL_UPDATE);
-	timer_total = litex_read64(TIMER_TOTAL);
+	sys_write8(UPDATE_TOTAL, TIMER_TOTAL_UPDATE);
+	timer_total = (uint64_t)sys_read32(TIMER_TOTAL);
 
 	k_spin_unlock(&lock, key);
 
@@ -82,10 +84,8 @@ int sys_clock_driver_init(const struct device *dev)
 	sys_write8(TIMER_DISABLE, TIMER_EN_ADDR);
 
 	for (int i = 0; i < 4; i++) {
-		sys_write8(k_ticks_to_cyc_floor32(1) >> (24 - i * 8),
-				TIMER_RELOAD_ADDR + i * 0x4);
-		sys_write8(k_ticks_to_cyc_floor32(1) >> (24 - i * 8),
-				TIMER_LOAD_ADDR + i * 0x4);
+		sys_write32(k_ticks_to_cyc_floor32(1), TIMER_RELOAD_ADDR);
+		sys_write32(k_ticks_to_cyc_floor32(1), TIMER_LOAD_ADDR);
 	}
 
 	sys_write8(TIMER_ENABLE, TIMER_EN_ADDR);

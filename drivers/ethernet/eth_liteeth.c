@@ -35,20 +35,19 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define LITEETH_SLOT_TX0	((LITEETH_SLOT_BASE) + 0x1000)
 #define LITEETH_SLOT_TX1	((LITEETH_SLOT_BASE) + 0x1800)
 
+#define LITEETH_BASE		DT_INST_REG_ADDR_BY_NAME(0, control)
 /* sram - rx */
-#define LITEETH_RX_BASE		DT_INST_REG_ADDR_BY_NAME(0, control)
-#define LITEETH_RX_SLOT		((LITEETH_RX_BASE) + 0x00)
-#define LITEETH_RX_LENGTH	((LITEETH_RX_BASE) + 0x04)
-#define LITEETH_RX_EV_PENDING	((LITEETH_RX_BASE) + 0x28)
-#define LITEETH_RX_EV_ENABLE	((LITEETH_RX_BASE) + 0x2c)
+#define LITEETH_RX_SLOT		((LITEETH_BASE) + 0x00)
+#define LITEETH_RX_LENGTH	((LITEETH_BASE) + 0x04)
+#define LITEETH_RX_EV_PENDING	((LITEETH_BASE) + 0x10)
+#define LITEETH_RX_EV_ENABLE	((LITEETH_BASE) + 0x14)
 
 /* sram - tx */
-#define LITEETH_TX_BASE		((DT_INST_REG_ADDR_BY_NAME(0, control)) + 0x30)
-#define LITEETH_TX_START	((LITEETH_TX_BASE) + 0x00)
-#define LITEETH_TX_READY	((LITEETH_TX_BASE) + 0x04)
-#define LITEETH_TX_SLOT		((LITEETH_TX_BASE) + 0x0c)
-#define LITEETH_TX_LENGTH	((LITEETH_TX_BASE) + 0x10)
-#define LITEETH_TX_EV_PENDING	((LITEETH_TX_BASE) + 0x1c)
+#define LITEETH_TX_START	((LITEETH_BASE) + 0x18)
+#define LITEETH_TX_READY	((LITEETH_BASE) + 0x1c)
+#define LITEETH_TX_SLOT		((LITEETH_BASE) + 0x24)
+#define LITEETH_TX_LENGTH	((LITEETH_BASE) + 0x28)
+#define LITEETH_TX_EV_PENDING	((LITEETH_BASE) + 0x30)
 
 /* irq */
 #define LITEETH_IRQ		DT_INST_IRQN(0)
@@ -94,9 +93,8 @@ static int eth_tx(const struct device *dev, struct net_pkt *pkt)
 	net_pkt_read(pkt, context->tx_buf[context->txslot], len);
 
 	sys_write8(context->txslot, LITEETH_TX_SLOT);
-	sys_write8(len >> 8, LITEETH_TX_LENGTH);
-	sys_write8(len & 0xFF, LITEETH_TX_LENGTH + 4);
-
+	sys_write16(len, LITEETH_TX_LENGTH);
+	
 	/* wait for the device to be ready to transmit */
 	while (sys_read8(LITEETH_TX_READY) == 0) {
 		if (attempts++ == MAX_TX_FAILURE) {
@@ -132,10 +130,7 @@ static void eth_rx(const struct device *port)
 	key = irq_lock();
 
 	/* get frame's length */
-	for (int i = 0; i < 4; i++) {
-		len <<= 8;
-		len |= sys_read8(LITEETH_RX_LENGTH + i * 0x4);
-	}
+	len = sys_read16(LITEETH_RX_LENGTH);	
 
 	/* which slot is the frame in */
 	context->rxslot = sys_read8(LITEETH_RX_SLOT);

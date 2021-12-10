@@ -1,0 +1,8 @@
+# Copyright (c) 2021 Technosystem sp. z o.o.
+# SPDX-License-Identifier: Apache-2.0
+
+description: MAX6642 Digital Temperature Sensor with 2-Wire Interface.
+
+compatible: "max6642"
+
+include: i2c-device.yaml
